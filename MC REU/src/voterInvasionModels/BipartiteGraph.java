@@ -18,27 +18,48 @@ import java.util.Random;
  * n and the other of size m. Every member of the n sized group has a connection
  * to every member of the m sized group and vice versa.
  * 
+ * In this, we simulate the voter and invasion models on the complete bipartite
+ * graph. Each person in a population is given opinion 0 or 1. We randomly
+ * select a person in the population (person A), then randomly select one of
+ * their neighbors (person B). In the voter model, person A adopts the opinion
+ * of person B. In the invasion model, person A forces their opinion onto person
+ * B. At each time step, we observe the number of 1 opinions of the large group
+ * N and the number of 1 opinions of the small group M. This goes on until there
+ * is a consensus in the population. The purpose of this project is to make
+ * observations such as the average time to consensus, or the quasi-stationary
+ * distribution of the process. That is, conditioned on not being at a
+ * consensus, the distribution of the amount of 1 opinions in each group.
+ * 
  * @author Clayton Allard
  *
  */
 public class BipartiteGraph {
 
+	// list of people.
 	private ArrayList<Person> people = new ArrayList<>();
-//	private HashSet<String> connections = new HashSet<>();
+	// determines if voter or invasion model.
 	private boolean voterModel;
+	// current amount of time steps.
 	private int time;
-	private int timeToAbsorbing;
+	// amount of people in the small group M.
 	private int smallGroupAmount;
+	// amount of people in the large group N.
 	private int largeGroupAmount;
+	// current amount of people with opinion 1 in small group and large group (i.e.
+	// (4, 3)).
 	private int[] currState = new int[2];
+	// list of states from each time step (Ex:[(2,1), (2,2), (2,2), (1,2)]).
 	private ArrayList<String> stateList = new ArrayList<>();
 
-	public void reset() {
-		time = 0;
-		timeToAbsorbing = 0;
-		stateList = new ArrayList<>();
-	}
-
+	/**
+	 * Constructs graph consisting of two groups. A large group and a small group.
+	 * Everyone in the large group is connected to everyone in the small group and
+	 * vice versa. But no one in the same group is connected to eachother.
+	 * 
+	 * @param largeGroup - number of people in the large group.
+	 * @param smallGroup - number of people in the large group.
+	 * @param voter      - voter model if true. Invasion model if false.
+	 */
 	public BipartiteGraph(int largeGroup, int smallGroup, boolean voter) {
 		voterModel = voter;
 		smallGroupAmount = Math.min(smallGroup, largeGroup);
@@ -73,20 +94,39 @@ public class BipartiteGraph {
 		people.sort((x, y) -> x.getID() - y.getID());
 	}
 
+	/**
+	 * Adds connection between two people.
+	 * 
+	 * @param p1 - person 1.
+	 * @param p2 - person 2.
+	 */
 	private void addRelation(Person p1, Person p2) {
 		if (p1.equals(p2)) {
 			return;
 		}
 		p1.addNeighbor(p2);
-		String s = connectionString(p1, p2);
-//		if (!connections.contains(s)) {
-//			connections.add(s);
-//		}
 	}
 
-	private void set(int k, int h) {
+	/**
+	 * Resets the graph to its default state of starting at time 0.
+	 */
+	private void reset() {
+		time = 0;
+		stateList = new ArrayList<>();
+	}
+
+	/**
+	 * Manually set the current state of the graph. That is, set the amount of
+	 * people with opinion 1 in the large group and small group.
+	 * 
+	 * @param k
+	 * @param h
+	 */
+	public void set(int k, int h) {
+		reset();
 		currState[0] = k;
 		currState[1] = h;
+		// set opinions for small group.
 		for (int i = 0; i < smallGroupAmount; i++) {
 			if (i < h) {
 				people.get(i).setOpinion(1);
@@ -94,6 +134,7 @@ public class BipartiteGraph {
 				people.get(i).setOpinion(0);
 			}
 		}
+		// set opinions for small group.
 		for (int i = smallGroupAmount; i < people.size(); i++) {
 			if (i < k + smallGroupAmount) {
 				people.get(i).setOpinion(1);
@@ -101,87 +142,25 @@ public class BipartiteGraph {
 				people.get(i).setOpinion(0);
 			}
 		}
-		stateList.add((double) currState[0] / largeGroupAmount + "\t" + (double) currState[1] / smallGroupAmount);
+//		stateList.add((double) currState[0] / largeGroupAmount + "\t" + (double) currState[1] / smallGroupAmount);
 	}
 
-	public void addRelations(ArrayList<Person> p1, ArrayList<Person> p2) throws IllegalArgumentException {
-		if (p1.size() != p2.size()) {
-			throw new IllegalArgumentException("Must have equal sized lists");
-		}
-		// don't want to change anything until it is safe to.
-		for (int i = 0; i < p1.size(); i++) {
-			if (p1.get(i).equals(p2.get(i))) {
-				throw new IllegalArgumentException("Cannot have self relation");
-			}
-		}
-		for (int i = 0; i < p1.size(); i++) {
-			addRelation(p1.get(i), p2.get(i));
-		}
-	}
-
-	public void addRelations(ArrayList<Person> peep) {
-		for (int i = 0; i < peep.size() - 1; i++) {
-			for (int j = i + 1; j < peep.size(); j++) {
-				addRelation(peep.get(i), peep.get(j));
-			}
-		}
-	}
-
-	public ArrayList<Person> allNeighbors(Person p) {
-		return p.neighbors();
-	}
-
-//	public String connectionString() {
-//		String str = "";
-//		ArrayList<String> arr = new ArrayList<>(connections);
-//		arr.sort(null);
-//		for (String s : arr) {
-//			str += s + "\n";
-//		}
-//		return str;
-//	}
-
-	private String connectionString(Person p1, Person p2) {
-
-		if (p1.getID() < p2.getID()) {
-			return p1.getID() + " -- " + p2.getID();
-		} else {
-			return p2.getID() + " -- " + p1.getID();
-		}
-	}
-
-	public void removeRelation(Person p1, Person p2) {
-		if (p1.removeNeighbor(p2) && p2.removeNeighbor(p1)) {
-//			connections.remove(connectionString(p1, p2));
-			if (p1.neighbors().isEmpty()) {
-				people.remove(p1);
-			}
-			if (p2.neighbors().isEmpty()) {
-				people.remove(p2);
-			}
-		}
-	}
-
-	public void removeAllRelations(Person p) {
-		for (Person per : p.neighbors()) {
-			removeRelation(p, per);
-		}
-	}
-
-	public void removeRelations(ArrayList<Person> p1, ArrayList<Person> p2) throws IllegalArgumentException {
-		if (p1.size() != p2.size()) {
-			throw new IllegalArgumentException("Must have equal sized lists");
-		}
-		for (int i = 0; i < p1.size(); i++) {
-			removeRelation(p1.get(i), p2.get(i));
-		}
-	}
-
+	/**
+	 * Takes step in the process.
+	 * 
+	 * @return string representing who took over who's opinion.
+	 */
 	public String step() {
 		Random rng = new Random();
 		return step(rng);
 	}
 
+	/**
+	 * Takes step in the process.
+	 * 
+	 * @param rng - to set seed.
+	 * @return string representing who took over who's opinion.
+	 */
 	public String step(Random rng) {
 		time++;
 		if (voterModel) {
@@ -191,33 +170,50 @@ public class BipartiteGraph {
 		}
 	}
 
+	/**
+	 * Run the process until there is a consensus.
+	 */
 	public void simulation() {
 		simulation(new Random());
 	}
 
+	/**
+	 * Run the process until there is a consensus.
+	 * 
+	 * @param rng - to set seed.
+	 */
 	public void simulation(Random rng) {
 		while (!consensus())
 			step(rng);
 	}
 
+	/**
+	 * Amount of steps the process has been running.
+	 */
 	public int time() {
 		return time;
 	}
 
-	public int timeToConsensus() {
-		return timeToAbsorbing;
-	}
-
+	/**
+	 * Taking a step with the voter model. We randomly select a person who takes on
+	 * the opinion of one of their randomly selected neighbors.
+	 * 
+	 * @param rng - to set seed
+	 * @return string representing who took over who's opinion.
+	 */
 	private String voterStep(Random rng) {
+		// get the correct people.
 		Person changeOpinion = people.get(rng.nextInt(people.size()));
 		ArrayList<Person> neighbors = changeOpinion.neighbors();
 		Person forceOpinion = neighbors.get(rng.nextInt(neighbors.size()));
+		// see if the forced opinion comes from small group.
 		if (forceOpinion.getID() <= smallGroupAmount) {
 			if (forceOpinion.getOpinion() == 1 && changeOpinion.getOpinion() == 0) {
 				currState[0]++;
 			} else if (forceOpinion.getOpinion() == 0 && changeOpinion.getOpinion() == 1) {
 				currState[0]--;
 			}
+			// see if forced opinion comes from large group.
 		} else {
 			if (forceOpinion.getOpinion() == 1 && changeOpinion.getOpinion() == 0) {
 				currState[1]++;
@@ -228,13 +224,16 @@ public class BipartiteGraph {
 
 		changeOpinion.setOpinion(forceOpinion.getOpinion());
 //		stateList.add((double) currState[0] / largeGroupAmount + "\t" + (double) currState[1] / smallGroupAmount);
-//		if (currentAmount() != 0 && currentAmount() != people.size()) {
-//			timeToAbsorbing = time;
-//		}
-//		currentAmount.add(currentAmount());
 		return changeOpinion.getID() + " <- " + forceOpinion.getID();
 	}
 
+	/**
+	 * Taking a step with the voter model. We randomly select a person who takes on
+	 * the opinion of one of their randomly selected neighbors.
+	 * 
+	 * @param rng - to set seed
+	 * @return string representing who took over who's opinion.
+	 */
 	private String invasionStep(Random rng) {
 		// get the correct people.
 		Person forceOpinion = people.get(rng.nextInt(people.size()));
@@ -247,6 +246,7 @@ public class BipartiteGraph {
 			} else if (forceOpinion.getOpinion() == 0 && changeOpinion.getOpinion() == 1) {
 				currState[0]--;
 			}
+			// see if the forced opinion comes from large group.
 		} else {
 			if (forceOpinion.getOpinion() == 1 && changeOpinion.getOpinion() == 0) {
 				currState[1]++;
@@ -257,13 +257,12 @@ public class BipartiteGraph {
 
 		changeOpinion.setOpinion(forceOpinion.getOpinion());
 //		stateList.add((double) currState[0] / largeGroupAmount + "\t" + (double) currState[1] / smallGroupAmount);
-//		if (currentAmount() != 0 && currentAmount() != people.size()) {
-//			timeToAbsorbing = time;
-//		}
-//		currentAmount.add(currentAmount());
 		return forceOpinion.getID() + " -> " + changeOpinion.getID();
 	}
 
+	/**
+	 * returns the string of the graph which is the list of states.
+	 */
 	@Override
 	public String toString() {
 		StringBuilder str = new StringBuilder();
@@ -273,15 +272,25 @@ public class BipartiteGraph {
 		return str.toString();
 	}
 
+	/**
+	 * Returns the current state of the model. The amount of 1 opinions in the large
+	 * group followed by the number of 1 opinions in the small group.
+	 */
 	public String currentState() {
 		return currState[0] + "\t" + currState[1];
 	}
 
+	/**
+	 * Determines whether the model has reached a consensus.
+	 */
 	public boolean consensus() {
 		return (currState[0] == 0 && currState[1] == 0)
 				|| (currState[0] == largeGroupAmount && currState[1] == smallGroupAmount);
 	}
 
+	/**
+	 * Computes the average value of integers in a list.
+	 */
 	private static double average(ArrayList<Integer> arr) {
 		int count = 0;
 		for (Integer i : arr) {
@@ -290,6 +299,9 @@ public class BipartiteGraph {
 		return (double) count / arr.size();
 	}
 
+	/**
+	 * Computes the sample variance of integers in a list.
+	 */
 	private static double sampleVariance(ArrayList<Integer> arr) {
 		double average = average(arr);
 		double variance = 0;
@@ -299,6 +311,13 @@ public class BipartiteGraph {
 		return variance;
 	}
 
+	/**
+	 * Creates a hashmap consisting of a string version of each state (i.e. "[5,
+	 * 2]").
+	 * 
+	 * @param largeGroup - amount in large group.
+	 * @param smallGroup - amount in small group.
+	 */
 	private static HashMap<String, Integer> hashMap(int largeGroup, int smallGroup) {
 
 		HashMap<String, Integer> map = new HashMap<>();
@@ -310,6 +329,9 @@ public class BipartiteGraph {
 		return map;
 	}
 
+	/*
+	 * Converts string into the actual array representation of the state.
+	 */
 	private static int[] parse(String vect) {
 		int[] nums = new int[2];
 		int cutoff = vect.indexOf('\t');
@@ -318,6 +340,13 @@ public class BipartiteGraph {
 		return nums;
 	}
 
+	/**
+	 * Creates ordering among the states. Used for sorting to display in a
+	 * reasonable fashion.
+	 * 
+	 * @param s1 - state 1.
+	 * @param s2 - state 2.
+	 */
 	private static int compare(String s1, String s2) {
 		int cutoff1 = s1.indexOf('\t');
 		int firstEntry1 = Integer.parseInt(s1.substring(0, cutoff1));
@@ -341,18 +370,43 @@ public class BipartiteGraph {
 		}
 	}
 
+	/**
+	 * Create a new startpoint for the graph by sampling from the distribution of
+	 * the proportion of time spent at each state.. Here we define a mult set to be
+	 * a set of identical numbers (usually the max of 2147483647). This is due to
+	 * java's integer limitation and we use this to do samples beyond that
+	 * limitation.
+	 * 
+	 * @param map   - hashmap consisting of the count for the amount of times each
+	 *              state has been reached overall.
+	 * @param count - amount of steps for the mult set.
+	 * @param step  - total steps per mult set.
+	 * @param mult  - amount of mult sets.
+	 */
 	private int[] startPoint(HashMap<String, Integer> map, int count, int step, int mult) {
 		double randVal = new Random().nextDouble();
 		double currentInc = 0;
 		for (Entry<String, Integer> str : map.entrySet()) {
+			// never been visited.
 			if (str.getValue() == 0) {
 				continue;
 			}
+			/*
+			 * To prevent integer overflow. We are solving for the inequality
+			 * currTotal/(step*mult + count) < randVal where currTotal is the cumulative
+			 * amount of times at the state for each state checked. We manipulate the
+			 * equation be taking the inverse of the left side, separating the numerator,
+			 * and spliting the currTotal into the product of square roots. Then we separate
+			 * the numerator and denominator to avoid integer overflow.
+			 */
 			double sOt = (double) step / Math.sqrt(str.getValue());
 			double mOt = (double) (mult - 1) / Math.sqrt(str.getValue());
+			// if this inequality holds, then it means the amount of steps at the state is
+			// so small that we just consider it to be 0.
 			if (2147483747.0 / sOt < mOt) {
 				continue;
 			}
+			// converting back into a proportion.
 			double cOt = (double) count / str.getValue();
 			currentInc += Math.pow(sOt * mOt + cOt, -1);
 			if (currentInc > randVal) {
@@ -365,6 +419,13 @@ public class BipartiteGraph {
 		return startPoint(map, count, step, mult);
 	}
 
+	/**
+	 * Taking multiple random integers in a range without replacement.
+	 * 
+	 * @param low    - lower bound.
+	 * @param high   - upper bound.
+	 * @param amount - the amount of numbers to generate
+	 */
 	private static int[] multipleRandomNumbers(int low, int high, int amount) {
 		if (high - low + 1 < amount) {
 			amount = high - low + 1;
@@ -383,6 +444,18 @@ public class BipartiteGraph {
 		return nums;
 	}
 
+	/**
+	 * We focus on two people and each time the opinion of one of those people is
+	 * taken, we move our focus to who gave that opinion. This continues the two
+	 * focuses meet together or (coalesce). The thing to observe here is that the
+	 * eigenvalue of this transition model is the exact same as the voter model.
+	 * 
+	 * @param n    - size of the large group.
+	 * @param m    - size of the small group.
+	 * @param type - 1 = one in each group, 2 = both start in large group, 3 = both
+	 *             start in small group, otherwise it is completely random.
+	 * @return amount of time to coalesce.
+	 */
 	public static int coalesceTime(int n, int m, int type) {
 		Random rng = new Random();
 		int count = 0;
@@ -424,7 +497,7 @@ public class BipartiteGraph {
 		}
 		Person p1 = people.get(randNums[0]);
 		Person p2 = people.get(randNums[1]);
-		// start the simultion.
+		// start the simulation.
 		while (p1 != p2) {
 			count++;
 			Person forceOp = people.get(rng.nextInt(people.size()));
@@ -439,6 +512,15 @@ public class BipartiteGraph {
 		return count;
 	}
 
+	/**
+	 * Obtain a list for coalesce times.
+	 * 
+	 * @param n      - size of the large group.
+	 * @param m      - size of the small group.
+	 * @param type   - 1 = one in each group, 2 = both start in large group, 3 =
+	 *               both start in small group, otherwise it is completely random.
+	 * @param trials - amount of times to run experiment.
+	 */
 	public static ArrayList<Integer> coalesceTimeList(int n, int m, int type, int trials) {
 		ArrayList<Integer> arr = new ArrayList<>();
 		for (int i = 0; i < trials; i++) {
@@ -447,46 +529,106 @@ public class BipartiteGraph {
 		return arr;
 	}
 
+	/**
+	 * Simulates the quasi-stationary distribution or the proportion of time spent
+	 * at each state through the process conditioned on not going to consensus.
+	 * 
+	 * @param n     - size of the large group.
+	 * @param m     - size of the small group.
+	 * @param steps - amount of steps to run simulation for.
+	 * @param voter - voter model if true. Invasion model if false.
+	 * @return
+	 */
 	public static String quasiStationaryDistribution(int n, int m, int steps, boolean voter) {
 		return quasiStationaryDistribution(n, m, steps, 1, voter);
 	}
 
+	/**
+	 * Simulates the quasi-stationary distribution or the proportion of time spent
+	 * at each state through the process conditioned on not going to consensus.
+	 * 
+	 * @param n     - size of the large group.
+	 * @param m     - size of the small group.
+	 * @param steps - amount of steps to run simulation for.
+	 * @param mult  - amount of times to go "steps" amount of steps (i.e. mult*steps
+	 *              total). This is to avoid integer overflow errors.
+	 * @param voter - voter model if true. Invasion model if false.
+	 * @return
+	 */
 	public static String quasiStationaryDistribution(int n, int m, int steps, int mult, boolean voter) {
 		HashMap<String, Integer> space = quasiStationaryDistributionHash(n, m, steps, mult, voter);
 		return convertHashMapToString(n, m, steps, mult, space);
 	}
 
+	/**
+	 * Given a hashmap, converts into a string representation.
+	 * 
+	 * @param n     - size of the large group.
+	 * @param m     - size of the small group.
+	 * @param steps - amount of steps to run simulation for.
+	 * @param mult  - amount of times to go "steps" amount of steps (i.e. mult*steps
+	 *              total). This is to avoid integer overflow errors.
+	 * @param space - the hashmap of all the states.
+	 * @return
+	 */
 	private static String convertHashMapToString(int n, int m, int steps, int mult, HashMap<String, Integer> space) {
 		ArrayList<String> arr = new ArrayList<>();
 		for (Entry<String, Integer> str : space.entrySet()) {
 			arr.add(str.getKey());
 		}
 		arr.sort((x, y) -> compare(x, y));
+		// do not count absorbing or unreachable states.
 		arr.remove("0\t0");
 		arr.remove(n + "\t" + m);
 		arr.remove("0\t" + m);
 		arr.remove(n + "\t0");
-		String s = "";
+		StringBuilder s = new StringBuilder();
 		for (String str : arr) {
-			s += str + "\t" + space.get(str) + "\t" + (double) ((double) space.get(str) / steps) / mult + "\n";
+			s.append(str + "\t" + space.get(str) + "\t" + (double) ((double) space.get(str) / steps) / mult + "\n");
 		}
-		return s;
+		return s.toString();
 	}
 
-	public static String quasiStationaryDistribution(int n, int m, int steps, int mult, HashMap<String, Integer> map) {
+	/**
+	 * Simulates the quasi-stationary distribution or the proportion of time spent
+	 * at each state through the process conditioned on not going to consensus.
+	 * 
+	 * @param n     - size of the large group.
+	 * @param m     - size of the small group.
+	 * @param steps - amount of steps to run simulation for.
+	 * @param mult  - amount of times to go "steps" amount of steps (i.e. mult*steps
+	 *              total). This is to avoid integer overflow errors.
+	 * @param map   - a hashmap of values.
+	 * @return
+	 */
+	private static String quasiStationaryDistribution(int n, int m, int steps, int mult, HashMap<String, Integer> map) {
 		return convertHashMapToString(n, m, steps, mult, map);
 	}
 
+	/**
+	 * Returns the string representation of the hashmap of the marginal distribution
+	 * with the proportion of time spent at each N value.
+	 * 
+	 * @param n   - number of nodes in big group.
+	 * @param map - map of all the amounts of steps for each state.
+	 */
 	public static String marginalN(int n, HashMap<String, Integer> map) {
 		HashMap<Integer, Integer> marg = marginalNWork(n, map);
-		String s = "";
+		StringBuilder s = new StringBuilder();
 		int total = total(marg);
 		for (Entry<Integer, Integer> num : marg.entrySet()) {
-			s += num.getKey() + "\t" + num.getValue() + "\t" + (double) num.getValue() / total + "\n";
+			s.append(num.getKey() + "\t" + num.getValue() + "\t" + (double) num.getValue() / total + "\n");
 		}
-		return s;
+		return s.toString();
 	}
 
+	/**
+	 * Returns the hashmap of the marginal distribution with the proportion of time
+	 * spent at each N value.
+	 * 
+	 * @param n   - number of nodes in big group.
+	 * @param map - map of all the amounts of steps for each state.
+	 */
 	private static HashMap<Integer, Integer> marginalNWork(int n, HashMap<String, Integer> map) {
 		HashMap<Integer, Integer> marg = new HashMap<>();
 		for (int i = 0; i <= n; i++) {
@@ -552,6 +694,7 @@ public class BipartiteGraph {
 	 * each of those points which results in a mixture.
 	 * 
 	 * @param n   - number of nodes in the big group.
+	 * @param m   - number of nodes in the small group.
 	 * @param map - the hashmap of the marginal distribution of the amount in the
 	 *            big group.
 	 */
@@ -579,12 +722,12 @@ public class BipartiteGraph {
 	 * each of those points which results in a mixture.
 	 * 
 	 * @param n   - number of nodes in the big group.
+	 * @param m   - number of nodes in the small group.
 	 * @param map - the hashmap of the marginal distribution of the amount in the
 	 *            big group.
 	 */
 	public static String mixtureNToString(int n, int m, HashMap<Integer, Double> weights) {
 		HashMap<Integer, Double> prob = mixtureN(n, m, weights);
-		// string to add to
 		StringBuilder s = new StringBuilder("\n");
 		for (Entry<Integer, Double> num : prob.entrySet()) {
 			s.append(num.getKey() + "\t" + num.getValue() + "\n");
@@ -592,25 +735,44 @@ public class BipartiteGraph {
 		return s.toString();
 	}
 
+	/**
+	 * Returns the string representation of the hashmap of the marginal distribution
+	 * with the proportion of time spent at each M value.
+	 * 
+	 * @param m   - number of nodes in small group.
+	 * @param map - map of all the amounts of steps for each state.
+	 */
 	public static String marginalM(int m, HashMap<String, Integer> map) {
 		HashMap<Integer, Integer> marg = new HashMap<>();
+		// for each M value, make a map computing the total.
 		for (int i = 0; i <= m; i++) {
 			marg.put(i, 0);
 		}
+		// get the key to know where to increment.
 		for (Entry<String, Integer> str : map.entrySet()) {
 			String s = str.getKey().substring(str.getKey().indexOf('\t') + 1, str.getKey().length());
 			int k = Integer.parseInt(s);
 			int amount = marg.get(k) + str.getValue();
 			marg.put(k, amount);
 		}
+		// take the total to proportion everything out.
 		int total = total(marg);
-		String s = "";
+		StringBuilder s = new StringBuilder();
 		for (Entry<Integer, Integer> num : marg.entrySet()) {
-			s += num.getKey() + "\t" + num.getValue() + "\t" + (double) num.getValue() / total + "\n";
+			s.append(num.getKey() + "\t" + num.getValue() + "\t" + (double) num.getValue() / total + "\n");
 		}
-		return s;
+		return s.toString();
 	}
 
+	/**
+	 * Given each M value, finds the proportion of time spent in N for all M. Gives
+	 * a list for each M.
+	 * 
+	 * @param n   - number of nodes in the big group.
+	 * @param m   - number of nodes in the small group.
+	 * @param map - the hashmap of the marginal distribution of the amount in the
+	 *            big group.
+	 */
 	public static String conditionalsOfAllN(int n, int m, HashMap<String, Integer> map) {
 		HashMap<Integer, HashMap<Integer, Integer>> cond = new HashMap<>();
 		for (int i = 0; i <= n; i++) {
@@ -623,24 +785,33 @@ public class BipartiteGraph {
 			int mVal = Integer.parseInt(parseM);
 			cond.get(nVal).put(mVal, str.getValue());
 		}
-		String s = "";
+		StringBuilder s = new StringBuilder();
 		for (Entry<Integer, HashMap<Integer, Integer>> vals : cond.entrySet()) {
 			int total = total(vals.getValue());
 			if (total == 0) {
 				continue;
 			}
-			s += "j=" + vals.getKey() + "\n";
+			s.append("j=" + vals.getKey() + "\n");
 			for (Entry<Integer, Integer> ints : vals.getValue().entrySet()) {
 				if ((vals.getKey() == 0 || vals.getKey() == n) && (ints.getKey() == 0 || ints.getKey() == m)) {
 					continue;
 				}
-				s += ints.getKey() + "\t" + ints.getValue() + "\t" + (double) ints.getValue() / total + "\n";
+				s.append(ints.getKey() + "\t" + ints.getValue() + "\t" + (double) ints.getValue() / total + "\n");
 			}
-			s += "\n";
+			s.append("\n");
 		}
-		return s;
+		return s.toString();
 	}
 
+	/**
+	 * Given each N value, finds the proportion of time spent in M for all M. Gives
+	 * a list for each N.
+	 * 
+	 * @param n   - number of nodes in the big group.
+	 * @param m   - number of nodes in the small group.
+	 * @param map - the hashmap of the marginal distribution of the amount in the
+	 *            big group.
+	 */
 	public static String conditionalsOfAllM(int n, int m, HashMap<String, Integer> map) {
 		HashMap<Integer, HashMap<Integer, Integer>> cond = new HashMap<>();
 		for (int i = 0; i <= m; i++) {
@@ -654,37 +825,57 @@ public class BipartiteGraph {
 			// setting each m value to have its own list.
 			cond.get(mVal).put(nVal, str.getValue());
 		}
-		String s = "";
+		StringBuilder s = new StringBuilder();
 		for (Entry<Integer, HashMap<Integer, Integer>> vals : cond.entrySet()) {
 			int total = total(vals.getValue());
 			if (total == 0) {
 				continue;
 			}
-			s += "i=" + vals.getKey() + "\n";
+			s.append("i=" + vals.getKey() + "\n");
 			for (Entry<Integer, Integer> ints : vals.getValue().entrySet()) {
 				// take out absorbing states and unreachable states instead of having them show
 				// up as 0.
 				if ((vals.getKey() == 0 || vals.getKey() == m) && (ints.getKey() == 0 || ints.getKey() == n)) {
 					continue;
 				}
-				s += ints.getKey() + "\t" + ints.getValue() + "\t" + (double) ints.getValue() / total + "\n";
+				s.append(ints.getKey() + "\t" + ints.getValue() + "\t" + (double) ints.getValue() / total + "\n");
 			}
-			s += "\n";
+			s.append("\n");
 		}
-		return s;
+		return s.toString();
 	}
 
+	/**
+	 * Simulates the quasi-stationary distribution.
+	 * 
+	 * @param n     - size of the large group.
+	 * @param m     - size of the small group.
+	 * @param steps - amount of steps to run simulation for.
+	 * @param voter - voter model if true. Invasion model if false.
+	 */
 	private static HashMap<String, Integer> quasiStationaryDistributionHash(int n, int m, int steps, boolean voter) {
 		return quasiStationaryDistributionHash(n, m, steps, 1, voter);
 	}
 
+	/**
+	 * Determines whether there should be a progress update for how long the code
+	 * has been running. Usually in 10% increments.
+	 * 
+	 * @param currStep - current step count.
+	 * @param currMult - current mult count.
+	 * @param steps    - total steps.
+	 * @param mult     - total amount of sets of "steps".
+	 * @return true if update, false otherwise.
+	 */
 	private static boolean update(int currStep, int currMult, int steps, int mult) {
+		// mult >= 10 case.
 		if (mult >= 10) {
 			if ((currMult % (mult / 10) == 0 || currMult == mult) && currStep == steps) {
 				return true;
 			}
 			return false;
 		}
+		// mult < 10 case.
 		int times = 10 / mult;
 		if ((steps > times - 1 && currStep % (steps / times) == 0) || currStep == steps) {
 			return true;
@@ -692,34 +883,58 @@ public class BipartiteGraph {
 		return false;
 	}
 
+	/**
+	 * Simulates the quasi-stationary distribution.
+	 * 
+	 * @param n     - size of the large group.
+	 * @param m     - size of the small group.
+	 * @param steps - amount of steps to run simulation for.
+	 * @param mult  - total amount of sets of "steps".
+	 * @param voter - voter model if true. Invasion model if false.
+	 */
 	private static HashMap<String, Integer> quasiStationaryDistributionHash(int n, int m, int steps, int mult,
 			boolean voter) {
 		HashMap<String, Integer> space = hashMap(n, m);
 
+		// counters.
 		int curr = 0;
 		int multCounter = 1;
+		// keep status for how many times we reach consensus.
 		int graphMakeCounter = -1;
 		int graphTotal = 0;
 		BipartiteGraph graph = new BipartiteGraph(n, m, voter);
+		Random rng = new Random();
+		// choose random from 1 to n-1 then random from 1 to m to guarantee no consensus
+		// to start.
+		int rand1 = rng.nextInt(n - 1) + 1;
+		int rand2 = rng.nextInt(m) + 1;
+		graph.set(rand1, rand2);
 
+		// keep reference for how long how code will run.
 		System.out.println("Start");
 
 		long startTime = System.currentTimeMillis();
 		while (curr < steps) {
+			// reset the amount of steps on the graph so we don't have to make a new graph.
 			graph.reset();
-			if (curr != 0) {
+			// if it is not the first step.
+			if (curr != 0 || multCounter != 1) {
 				int[] state = graph.startPoint(space, curr, steps, multCounter);
 				if (state != null) {
 					graph.set(state[0], state[1]);
 				}
 			}
+			// re-randomize everything if we initialize a state that is unreachable or
+			// absorbing.
 			if (graph.consensus() || graph.currentState().contains("0\t" + m)
 					|| graph.currentState().contains(n + "\t0")) {
 				continue;
 			}
 			graphMakeCounter++;
+			// keep following these steps until consensus or number of steps.
 			while (!graph.consensus() && curr < steps) {
 				curr++;
+				// update periodically so we know the progress of the code.
 				if (update(curr, multCounter, steps, mult)) {
 					graphTotal += graphMakeCounter;
 					System.out.println(multCounter + "\t" + curr + "   (" + n + "," + m
@@ -727,10 +942,12 @@ public class BipartiteGraph {
 							+ "\tConsensus amount total: " + graphTotal + "\tCurrent State: " + graph.currentState());
 					graphMakeCounter = 0;
 				}
+				// reset the step counter.
 				if (curr == steps && multCounter < mult) {
 					curr = 0;
 					multCounter++;
 				}
+				// change the state and keep the data.
 				String currentState = graph.currentState();
 				int amount = space.get(currentState) + 1;
 				space.put(currentState, amount);
@@ -742,13 +959,31 @@ public class BipartiteGraph {
 		return space;
 	}
 
+	/**
+	 * Simulates the quasi-stationary distribution in table format.
+	 * 
+	 * @param n     - size of the large group.
+	 * @param m     - size of the small group.
+	 * @param steps - amount of steps to run simulation for.
+	 * @param voter - voter model if true. Invasion model if false.
+	 */
 	public static String quasiStationaryDistributionTable(int n, int m, int steps, boolean voter) {
 		return quasiStationaryDistributionTable(n, m, steps, 1, voter);
 	}
 
+	/**
+	 * Simulates the quasi-stationary distribution in table format.
+	 * 
+	 * @param n     - size of the large group.
+	 * @param m     - size of the small group.
+	 * @param steps - amount of steps to run simulation for.
+	 * @param mult  - total amount of sets of "steps".
+	 * @param voter - voter model if true. Invasion model if false.
+	 */
 	public static String quasiStationaryDistributionTable(int n, int m, int steps, int mult, boolean voter) {
-		String s = "";
+		StringBuilder s = new StringBuilder();
 		HashMap<String, Integer> space = hashMap(n, m);
+		// keep track of the N then M value for the nested hashmap.
 		HashMap<Integer, HashMap<Integer, Double>> map = new HashMap<>();
 		for (int i = 0; i <= n; i++) {
 			HashMap<Integer, Double> dub = new HashMap<>();
@@ -757,37 +992,58 @@ public class BipartiteGraph {
 				dub.put(j, 0.0);
 			}
 		}
+		// counters.
 		int curr = 0;
 		int multCounter = 1;
-		int graphMakeCounter = 0;
+		// keep status for how many times we reach consensus.
+		int graphMakeCounter = -1;
 		int graphTotal = 0;
 		BipartiteGraph graph = new BipartiteGraph(n, m, voter);
+		Random rng = new Random();
+		// choose random from 1 to n-1 then random from 1 to m to guarantee no consensus
+		// to start.
+		int rand1 = rng.nextInt(n - 1) + 1;
+		int rand2 = rng.nextInt(m) + 1;
+		graph.set(rand1, rand2);
+
+		// keep reference for how long how code will run.
+		System.out.println("Start");
+
+		long startTime = System.currentTimeMillis();
 		while (curr < steps) {
+			// reset the amount of steps on the graph so we don't have to make a new graph.
 			graph.reset();
-			if (curr != 0) {
+			// if it is not the first step.
+			if (curr != 0 || multCounter != 1) {
 				int[] state = graph.startPoint(space, curr, steps, multCounter);
 				if (state != null) {
 					graph.set(state[0], state[1]);
 				}
 			}
+			// re-randomize everything if we initialize a state that is unreachable or
+			// absorbing.
 			if (graph.consensus() || graph.currentState().contains("0\t" + m)
 					|| graph.currentState().contains(n + "\t0")) {
 				continue;
 			}
 			graphMakeCounter++;
+			// keep following these steps until consensus or number of steps.
 			while (!graph.consensus() && curr < steps) {
 				curr++;
+				// update periodically so we know the progress of the code.
 				if (update(curr, multCounter, steps, mult)) {
 					graphTotal += graphMakeCounter;
 					System.out.println(multCounter + "\t" + curr + "   (" + n + "," + m
 							+ ")\tAmount of Consensus since last update: " + graphMakeCounter
-							+ "\tConsensus amount total: " + graphTotal);
+							+ "\tConsensus amount total: " + graphTotal + "\tCurrent State: " + graph.currentState());
 					graphMakeCounter = 0;
 				}
+				// reset the step counter.
 				if (curr == steps && multCounter < mult) {
 					curr = 0;
 					multCounter++;
 				}
+				// change the state and keep the data.
 				String currentState = graph.currentState();
 				int amount = space.get(currentState) + 1;
 				space.put(currentState, amount);
@@ -802,48 +1058,68 @@ public class BipartiteGraph {
 				map.get(amountJ).put(amountI, d);
 			}
 		}
+		long endTime = System.currentTimeMillis();
+		System.out.println(endTime - startTime);
+		// output the data.
 		for (Entry<Integer, HashMap<Integer, Double>> ent : map.entrySet()) {
 			for (Entry<Integer, Double> nums : ent.getValue().entrySet()) {
-				s += nums.getValue() + "\t";
+				s.append(nums.getValue() + "\t");
 			}
-			s += "\n";
+			s.append("\n");
 		}
-		return s;
+		return s.toString();
 	}
 
+	/**
+	 * Average time to coalesce for a range of 3,...,n and 1,...,m values.
+	 * 
+	 * @param n - upper bound for number of people in the large group.
+	 * @param m - upper bound for number of people in the small group.
+	 */
 	public static String coalesceTimeData(int n, int m) {
 		int trials = 1000;
-		String output = "(n,m) ";
+		StringBuilder output = new StringBuilder("(n,m) ");
+		// nested array list to represent m then n values.
 		ArrayList<ArrayList<Double>> arr = new ArrayList<>();
+		// input the m value columns.
 		for (int j = 1; j <= m; j++) {
-			output += j + " ";
+			output.append(j + "\t");
 			ArrayList<Double> averages = new ArrayList<>();
 			arr.add(averages);
+			// get data for each corresponding n.
 			for (int i = 3; i <= n; i++) {
 				averages.add(average(coalesceTimeList(i, j, 0, trials)));
+				// update the progress.
 				if ((n > 3 && i % (n / 4) == 0) || i == n) {
-					System.out.println(j + "  " + i);
+					System.out.println(j + "\t" + i);
 				}
 			}
 		}
 		System.out.println("printing");
-		output += "\n";
+		output.append("\n");
+		// output the data.
 		for (int i = 0; i < arr.get(0).size(); i++) {
-			output += (i + 3) + " ";
+			output.append((i + 3) + "\t");
 			for (int j = 0; j < arr.size(); j++) {
-				output += arr.get(j).get(i) + " ";
+				output.append(arr.get(j).get(i) + "\t");
 			}
-			output += "\n";
+			output.append("\n");
 		}
 		System.out.println("done");
-		return output;
+		return output.toString();
 	}
 
+	/**
+	 * Average time to coalesce with a range of n values from 3,...,n and m = 1
+	 * 
+	 * @param n      - upper bound for number of people in the large group.
+	 * @param trials - number of trials for each.
+	 */
 	public static String coalesceHistograms(int n, int trials) {
-		String output = "";
+		StringBuilder output = new StringBuilder();
 		ArrayList<ArrayList<Integer>> arr = new ArrayList<>();
 		for (int i = 3; i <= n; i++) {
-			output += i + " ";
+			output.append(i + " ");
 			arr.add(coalesceTimeList(i, 1, 0, trials));
 			// give status update.
 			if ((n > 3 && i % (n / 4) == 0) || i == n) {
@@ -851,17 +1127,23 @@ public class BipartiteGraph {
 			}
 		}
 		System.out.println("printing");
-		output += "\n";
+		output.append("\n");
 		for (int i = 0; i < trials; i++) {
 			for (int j = 0; j < arr.size(); j++) {
-				output += arr.get(j).get(i) + " ";
+				output.append(arr.get(j).get(i) + " ");
 			}
-			output += "\n";
+			output.append("\n");
 		}
 		System.out.println("done");
-		return output;
+		return output.toString();
 	}
 
+	/**
+	 * Computes the total integer value amount all keys in the hashmap.
+	 * 
+	 * @param map - Hashmap of integer keys and integer values.
+	 * @return the total.
+	 */
 	private static int total(HashMap<Integer, Integer> map) {
 		int total = 0;
 		for (Entry<Integer, Integer> str : map.entrySet()) {
@@ -870,6 +1152,15 @@ public class BipartiteGraph {
 		return total;
 	}
 
+	/**
+	 * Outputs all the useful data such as the proportion of time spent at each
+	 * state, the marginals, the and the conditionals.
+	 * 
+	 * @param n     - size of big group
+	 * @param m     - size of small group
+	 * @param steps - number of steps
+	 * @param voter - voter model or invasion model.
+	 */
 	public static String allQSDData(int n, int m, int steps, boolean voter) {
 		return allQSDData(n, m, steps, 1, voter);
 	}
@@ -895,16 +1186,27 @@ public class BipartiteGraph {
 		s.append("Quasi-Stationary Distribution\n" + quasiStationaryDistribution(n, m, steps, mult, map));
 		s.append("\nMarginal Distribution of N\n" + marginalN(n, map));
 		s.append("\nMarginal Distribution of M\n" + marginalM(m, map));
-		s.append("\nBinomial Mixture M" + mixtureNToString(n, m, prop));
+//		s.append("\nBinomial Mixture M" + mixtureNToString(n, m, prop));
 		s.append("\nConditional Distribution M|N\n" + conditionalsOfAllN(n, m, map));
 		s.append("\nConditional Distribution N|M\n" + conditionalsOfAllM(n, m, map));
 		return s.toString();
 	}
 
+	/**
+	 * Average amount of time for the model to come to consensus given a set start
+	 * point.
+	 * 
+	 * @param amount - amount of times to run the experiment.
+	 * @param n      - number of people in large group.
+	 * @param m      - number of people in small group.
+	 * @param state  - starting state.
+	 * @param voter  - voter model if true. Invasion model if false.
+	 */
 	public static double timeToAbsorbtion(int amount, int n, int m, String state, boolean voter) {
 		int[] pars = parse(state);
 		int count = 0;
 		double avg = 0.0;
+		// running the experiment.
 		while (count < amount) {
 			BipartiteGraph graph = new BipartiteGraph(n, m, voter);
 			graph.set(pars[0], pars[1]);
@@ -915,45 +1217,15 @@ public class BipartiteGraph {
 		return avg;
 	}
 
-	public static double proportionOfTimeIn0orN(int n, int m, int steps, int mult, boolean voter) {
-		HashMap<String, Integer> map = quasiStationaryDistributionHash(n, m, steps, mult, voter);
-		int amount = 0;
-		for (Entry<String, Integer> str : map.entrySet()) {
-			int[] state = parse(str.getKey());
-			if (state[0] == 0 || state[0] == n) {
-				amount += str.getValue();
-			}
-		}
-		return ((double) amount / steps) / mult;
-	}
-
-	public static String proportionOfTimeIn0orNPlot(int maxn, int maxm, int steps, int mult, boolean voter) {
-		HashMap<Integer, HashMap<Integer, Double>> map = new HashMap<>();
-		for (int i = 3; i <= maxn; i++) {
-			map.put(i, new HashMap<>());
-			for (int j = 2; j <= Math.min(i, maxm); j++) {
-				map.get(i).put(j, proportionOfTimeIn0orN(i, j, steps, mult, voter));
-			}
-		}
-		String s = "(n,m)   ";
-		for (int i = 2; i <= maxm; i++) {
-			s += i + "\t";
-		}
-		for (Entry<Integer, HashMap<Integer, Double>> ent : map.entrySet()) {
-			s += "\n" + ent.getKey() + "\t";
-			for (Entry<Integer, Double> val : ent.getValue().entrySet()) {
-				s += val.getValue() + "\t";
-			}
-		}
-		return s;
-	}
-
 	public static void main(String[] args) {
 		try {
 			PrintWriter out = new PrintWriter("src/voterInvasionModels/Invasion.txt");
-			int n = 300;
+			int n = 100;
 			int m = 10;
-			out.println(allQSDData(n, m, 100000, 10, false));
+			int steps = Integer.MAX_VALUE;
+			int mult = 5;
+			out.println(quasiStationaryDistributionTable(n, m, steps, mult, true));
+//			out.println(allQSDData(n, m, 100000, 10, true));
 //			BipartiteGraph g = new BipartiteGraph(200, 1, false);
 //			g.simulation();
 //			out.println(g.toString());
